@@ -1,0 +1,34 @@
+% tex4ht-fonts.4ht
+% Neutralise font-loading commands that cause infinite loops in DVI mode.
+% This file is copied into the working directory as fontspec.4ht, overriding
+% the system fontspec.4ht so that \setmainfont etc. become no-ops.
+
+\immediate\write-1{version oscola2docx-fontspec-stub}
+
+% fontspec commands: accept optional + mandatory args, do nothing
+\renewcommand{\setmainfont}[2][]{}
+\renewcommand{\setsansfont}[2][]{}
+\renewcommand{\setmonofont}[2][]{}
+\renewcommand{\newfontfamily}[3][]{}
+\renewcommand{\setmathrm}[2][]{}
+\renewcommand{\setmathsf}[2][]{}
+\renewcommand{\setmathtt}[2][]{}
+
+% unicode-math
+\ifdefined\setmathfont
+  \renewcommand{\setmathfont}[2][]{}
+\fi
+
+% luatexja-fontspec commands (if luatexja somehow loads)
+\ifdefined\setmainjfont
+  \renewcommand{\setmainjfont}[2][]{}
+\fi
+\ifdefined\setsansjfont
+  \renewcommand{\setsansjfont}[2][]{}
+\fi
+\ifdefined\newjfontfamily
+  \renewcommand{\newjfontfamily}[3][]{}
+\fi
+
+\Hinput{fontspec}
+\endinput

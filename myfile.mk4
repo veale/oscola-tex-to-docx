@@ -1,22 +1,39 @@
 -- myfile.mk4
 -- Build file for make4ht with biblatex-oscola support
 --
--- The compilation sequence is:
--- 1. htlatex  -> first pass, writes .bcf file for Biber
--- 2. biber    -> processes .bcf, produces .bbl with bibliography data
--- 3. htlatex  -> second pass, reads .bbl, establishes citation tracking
--- 4. htlatex  -> third pass, resolves all cross-references including
---               OSCOLA's "(n X)" back-references to first-citation footnotes
+-- Draft mode (default, recommended):
+--   Single htlatex pass. Citations are resolved post-hoc from .bib files
+--   by resolve-citations.py. This avoids a known tex4ht stack overflow
+--   (\cur:th / \a:newlabel recursion) triggered by biblatex-oscola's
+--   \footcite after biber resolves citations.
+--
+-- Full mode (--full flag, experimental):
+--   htlatex → biber → htlatex. May hit TeX capacity limits on large
+--   documents with many \footcite commands.
 
 local domfilter = require "make4ht-domfilter"
 local process = domfilter {"footnotes"}
 Make:match("html$", process)
 
+local function status(msg)
+  print("\n[STATUS]  make4ht: " .. msg)
+  io.stdout:flush()
+end
+
 if mode == "draft" then
+  status("Pass 1/1 (draft) - htlatex")
   Make:htlatex()
 else
+  status("Pass 1/4 - htlatex (initial compilation, writes .bcf)")
   Make:htlatex()
+  status("Pass 2/4 - biber (resolve bibliography)")
   Make:biber()
+  -- No aux file deletion needed: preprocess-tex.py patches \footcite
+  -- macros to use original \label/\ref, preventing the tex4ht
+  -- \a:newlabel / \rEfLiNK recursion. Keeping aux files lets
+  -- "(n X)" back-references resolve correctly.
+  status("Pass 3/4 - htlatex (resolve citations)")
   Make:htlatex()
+  status("Pass 4/4 - htlatex (resolve back-references)")
   Make:htlatex()
 end

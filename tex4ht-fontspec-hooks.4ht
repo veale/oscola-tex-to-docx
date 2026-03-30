@@ -1,0 +1,50 @@
+% fontspec-hooks.4ht (oscola2docx override)
+% Prevent fontspec and luaotfload from loading in tex4ht mode.
+% luaotfload's define_font callback causes infinite loops under dvilualatex.
+
+\immediate\write-1{version oscola2docx-fontspec-hooks}
+
+\:dontusepackage{fontspec}
+\:dontusepackage{fontspec-luatex}
+\:dontusepackage{fontspec-xetex}
+
+% Disable luaotfload's font callback which is the actual source of the hang.
+% luaotfload may already be loaded by the lualatex format, so we deactivate
+% its callbacks rather than trying to prevent loading.
+\directlua{
+  if luaotfload and luaotfload.main then
+    luaotfload.main = function() end
+  end
+  if luatexbase then
+    pcall(function()
+      luatexbase.remove_from_callback("define_font", "luaotfload.define_font")
+    end)
+    pcall(function()
+      luatexbase.remove_from_callback("pre_linebreak_filter", "luaotfload.node_processor")
+    end)
+    pcall(function()
+      luatexbase.remove_from_callback("hpack_filter", "luaotfload.node_processor")
+    end)
+    pcall(function()
+      luatexbase.remove_from_callback("glyph_stream_provider", "luaotfload.glyph_stream")
+    end)
+  end
+}
+
+% Also block luacolor which hooks into LuaTeX node processing
+\:dontusepackage{luacolor}
+
+% Provide stub commands so documents using fontspec don't error
+\providecommand{\setmainfont}[2][]{}
+\providecommand{\setsansfont}[2][]{}
+\providecommand{\setmonofont}[2][]{}
+\providecommand{\newfontfamily}[3][]{}
+\providecommand{\defaultfontfeatures}[2][]{}
+\providecommand{\addfontfeatures}[1]{}
+\providecommand{\newfontface}[3][]{}
+\providecommand{\setmathrm}[2][]{}
+\providecommand{\setmathsf}[2][]{}
+\providecommand{\setmathtt}[2][]{}
+\providecommand{\setmathfont}[2][]{}
+
+\endinput

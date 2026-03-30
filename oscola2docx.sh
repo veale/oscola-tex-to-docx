@@ -121,11 +121,22 @@ trap 'if [[ "$KEEP_HTML" == false ]]; then rm -rf "$WORK_DIR"; fi' EXIT
 
 echo "Working directory: $WORK_DIR"
 
-# Copy input files (tex, bib, images, styles from source directory)
-for ext in tex bib sty bst cls png jpg jpeg pdf eps svg; do
+# Copy input files (tex, bib, images, fonts, styles from source directory)
+for ext in tex bib sty bst cls png jpg jpeg pdf eps svg otf ttf woff woff2; do
     for f in "$INPUT_DIR"/*."$ext"; do
         [[ -f "$f" ]] && cp "$f" "$WORK_DIR/" 2>/dev/null || true
     done
+done
+
+# Copy subdirectories that TeX may reference (chapters, fonts, images, etc.)
+# Skips hidden dirs and common non-TeX directories to avoid copying large files.
+for d in "$INPUT_DIR"/*/; do
+    if [[ ! -d "$d" ]]; then continue; fi
+    dirname="$(basename "$d")"
+    case "$dirname" in
+        .*|__pycache__|node_modules) continue ;;
+    esac
+    cp -r "${d%/}" "$WORK_DIR/" 2>/dev/null || true
 done
 
 # Copy pipeline files
@@ -138,6 +149,13 @@ else
     cp "$SCRIPT_DIR/fix-footnotes.py" "$WORK_DIR/"
 fi
 cp "$SCRIPT_DIR/oscola2docx.cfg" "$WORK_DIR/"
+cp "$SCRIPT_DIR/tex4ht-fontspec-hooks.4ht" "$WORK_DIR/fontspec-hooks.4ht"
+cp "$SCRIPT_DIR/tex4ht-fonts.4ht" "$WORK_DIR/fontspec.4ht"
+cp "$SCRIPT_DIR/disable-luaotfload.lua" "$WORK_DIR/"
+
+# --- Pre-process: strip commands that cause tex4ht to hang ---
+cd "$WORK_DIR"
+python3 "$SCRIPT_DIR/preprocess-tex.py" "$INPUT_BASE.tex" 2>&1 || echo "Warning: pre-processing failed, continuing with original"
 
 # --- Run make4ht ---
 echo "Running make4ht..."
@@ -145,9 +163,8 @@ MAKE4HT_ARGS=(-e myfile.mk4 -c oscola2docx.cfg -l -f html5+common_domfilters)
 if [[ "$DRAFT" == true ]]; then
     MAKE4HT_ARGS+=(-m draft)
 fi
-MAKE4HT_ARGS+=("$INPUT_BASE.tex" "fn-in")
+MAKE4HT_ARGS+=("$INPUT_BASE.tex" "fn-in,svg")
 
-cd "$WORK_DIR"
 make4ht "${MAKE4HT_ARGS[@]}" 2>&1 || true
 
 HTMLFILE="${INPUT_BASE}.html"
@@ -169,6 +186,16 @@ if [[ "$USE_DOMFILTER" == false ]]; then
     HTMLFILE="$FIXED"
 fi
 
+# --- Resolve citations from .bib files ---
+BIB_FILES=("$WORK_DIR"/*.bib)
+if [[ ${#BIB_FILES[@]} -gt 0 && -f "${BIB_FILES[0]}" ]]; then
+    echo "Resolving citations..."
+    RESOLVED="${INPUT_BASE}-resolved.html"
+    if python3 "$SCRIPT_DIR/resolve-citations.py" "$HTMLFILE" "${BIB_FILES[@]}" -o "$RESOLVED" 2>&1; then
+        HTMLFILE="$RESOLVED"
+    fi
+fi
+
 # --- Run Pandoc ---
 echo "Running Pandoc..."
 PANDOC_ARGS=(
@@ -177,6 +204,7 @@ PANDOC_ARGS=(
     -o "$OUTPUT"
     --from html
     --to docx
+    --extract-media=.
 )
 
 # Use reference doc: user-provided > bundled > none

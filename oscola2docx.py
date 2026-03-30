@@ -96,13 +96,21 @@ def main():
     print(f"Working directory: {work_dir}", file=sys.stderr)
 
     try:
-        # Copy input files
+        # Copy input files (tex, bib, images, fonts, styles)
         source_dir = input_path.parent
         extensions = ['.tex', '.bib', '.sty', '.bst', '.cls',
-                      '.png', '.jpg', '.jpeg', '.pdf', '.eps', '.svg']
+                      '.png', '.jpg', '.jpeg', '.pdf', '.eps', '.svg',
+                      '.otf', '.ttf', '.woff', '.woff2']
         for ext in extensions:
             for f in source_dir.glob(f'*{ext}'):
                 shutil.copy2(f, work_dir)
+
+        # Copy subdirectories that TeX may reference (chapters, fonts, images, etc.)
+        # Skips hidden dirs and common non-TeX directories.
+        skip_dirs = {'.', '__pycache__', 'node_modules'}
+        for d in source_dir.iterdir():
+            if d.is_dir() and d.name not in skip_dirs and not d.name.startswith('.'):
+                shutil.copytree(d, work_dir / d.name, dirs_exist_ok=True)
 
         # Copy pipeline files
         if not args.no_domfilter:
@@ -116,8 +124,16 @@ def main():
             shutil.copy2(script_dir / 'fix-footnotes.py', work_dir)
 
         shutil.copy2(script_dir / 'oscola2docx.cfg', work_dir)
+        shutil.copy2(script_dir / 'tex4ht-fontspec-hooks.4ht',
+                     work_dir / 'fontspec-hooks.4ht')
+        shutil.copy2(script_dir / 'tex4ht-fonts.4ht', work_dir / 'fontspec.4ht')
+        shutil.copy2(script_dir / 'disable-luaotfload.lua', work_dir)
 
         input_base = input_path.stem
+
+        # Pre-process: strip commands that cause tex4ht to hang
+        run(['python3', str(script_dir / 'preprocess-tex.py'),
+             str(work_dir / f'{input_base}.tex')], cwd=work_dir)
 
         # Run make4ht
         print("Running make4ht...", file=sys.stderr)
@@ -127,7 +143,7 @@ def main():
         ]
         if args.draft:
             make4ht_cmd.extend(['-m', 'draft'])
-        make4ht_cmd.extend([f'{input_base}.tex', 'fn-in'])
+        make4ht_cmd.extend([f'{input_base}.tex', 'fn-in,svg'])
 
         run(make4ht_cmd, cwd=work_dir, check=False)
 
@@ -146,6 +162,19 @@ def main():
                 cwd=work_dir)
             html_file = fixed_file
 
+        # Resolve citation keys from .bib files (draft mode leaves raw keys)
+        bib_files = list(work_dir.glob('*.bib'))
+        if bib_files:
+            print("Resolving citations from .bib files...", file=sys.stderr)
+            resolved_file = work_dir / f'{input_base}-resolved.html'
+            resolve_cmd = [
+                'python3', str(script_dir / 'resolve-citations.py'),
+                str(html_file)
+            ] + [str(b) for b in bib_files] + ['-o', str(resolved_file)]
+            result = run(resolve_cmd, cwd=work_dir, check=False)
+            if resolved_file.exists():
+                html_file = resolved_file
+
         # Run Pandoc
         print("Running Pandoc...", file=sys.stderr)
         pandoc_cmd = [
@@ -153,7 +182,8 @@ def main():
             '--lua-filter', str(script_dir / 'pandoc-footnotes.lua'),
             '-o', str(output_path),
             '--from', 'html',
-            '--to', 'docx'
+            '--to', 'docx',
+            '--extract-media', '.'
         ]
         # Use reference doc: user-provided > bundled > none
         if args.reference_doc:
