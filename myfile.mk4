@@ -1,0 +1,22 @@
+-- myfile.mk4
+-- Build file for make4ht with biblatex-oscola support
+--
+-- The compilation sequence is:
+-- 1. htlatex  -> first pass, writes .bcf file for Biber
+-- 2. biber    -> processes .bcf, produces .bbl with bibliography data
+-- 3. htlatex  -> second pass, reads .bbl, establishes citation tracking
+-- 4. htlatex  -> third pass, resolves all cross-references including
+--               OSCOLA's "(n X)" back-references to first-citation footnotes
+
+local domfilter = require "make4ht-domfilter"
+local process = domfilter {"footnotes"}
+Make:match("html$", process)
+
+if mode == "draft" then
+  Make:htlatex()
+else
+  Make:htlatex()
+  Make:biber()
+  Make:htlatex()
+  Make:htlatex()
+end

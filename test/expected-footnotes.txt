@@ -1,0 +1,19 @@
+Expected footnote content for test-article.tex
+================================================
+
+Footnote 1: Joe Bloggs, The Law of Things (Oxford University Press 2025) 45.
+Footnote 2: Jane Jones, "Recent Developments in Widget Law" (2024) 87 Modern Law Review 100.
+Footnote 3: Smith v Jones 42.
+Footnote 4: Bloggs (n 1) 50.
+Footnote 5: Bloggs (n 1); Jones (n 2).
+Footnote 6: Human Rights Act 1998.
+Footnote 7: Smith v Jones (n 3).
+
+Total: 7 footnotes
+
+Notes:
+- Footnote 4 uses subsequent citation format with back-reference "(n 1)"
+- Footnote 5 is a multi-citation footnote from \footcites
+- Footnote 7 uses subsequent citation format with back-reference "(n 3)"
+- Case names (Smith v Jones) should be in italics
+- Book title (The Law of Things) should be in italics

@@ -1,0 +1,11 @@
+-- myfile-nodomfilter.mk4
+-- Build file without DOM filter, for inspecting raw HTML output
+
+if mode == "draft" then
+  Make:htlatex()
+else
+  Make:htlatex()
+  Make:biber()
+  Make:htlatex()
+  Make:htlatex()
+end

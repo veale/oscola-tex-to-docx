@@ -1,0 +1,41 @@
+\documentclass[a4paper,12pt]{article}
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage{csquotes}
+\usepackage[style=oscola]{biblatex}
+\addbibresource{test-article.bib}
+
+\title{Test Article for OSCOLA Conversion}
+\author{Test Author}
+\date{2025}
+
+\begin{document}
+
+\maketitle
+
+\section{Introduction}
+
+This is a test of the conversion pipeline. First, a book citation
+with a pinpoint reference.\footcite[45]{bloggs2025}
+
+Now citing a journal article.\footcite{jones2024}
+
+\section{Cases and Legislation}
+
+Citing a case.\footcite{smith_v_jones}
+
+Now citing the book again to test subsequent citation
+format.\footcite[50]{bloggs2025}
+
+Multiple citations in one footnote.\footcites{bloggs2025}{jones2024}
+
+Citing a piece of legislation.\footcite{human_rights_act}
+
+\section{Conclusion}
+
+A final citation back to the case to test repeated subsequent
+references.\footcite{smith_v_jones}
+
+\printbibliography
+
+\end{document}
