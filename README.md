@@ -1,8 +1,8 @@
 # oscola2docx
 
-Convert LaTeX documents using `biblatex-oscola` (the OSCOLA legal citation style) to `.docx` files with correct Word footnotes.
+Convert LaTeX documents using `biblatex-oscola` (bl-oscola) (the OSCOLA legal citation style) to `.docx` files with correct Word footnotes.
 
-This tool exists because biblatex-oscola's citation formatting — ibid tracking, "(n X)" back-references, case/legislation formatting, conditional short titles — is too complex for any external converter to replicate. Instead, we let TeX do the formatting via `make4ht`, capture the HTML output, resolve citations from `.bib` files, then convert to docx via Pandoc.
+This tool exists because [biblatex-oscola](https://github.com/PaulStanley/oscola-biblatex)'s citation formatting — ibid tracking (at least for editions below the 5th), "(n X)" back-references, case/legislation formatting, conditional short titles — is too complex for any external converter to replicate. The biblatex implementation of OSCOLA is however much better than any alternatives, such as CSL files, which cannot deal with OSCOLA's conditional logics. Instead, we let TeX do the formatting via `make4ht`, capture the HTML output with fully resolved citations, then convert to docx via Pandoc.
 
 ## Prerequisites
 
@@ -45,11 +45,11 @@ python3 oscola2docx.py input.tex -o output.docx
 
 ## How it works
 
-1. **Preprocessing** strips packages and commands that cause `dvilualatex` to hang or are irrelevant for HTML output: `fontspec`, `unicode-math`, `luatexja-fontspec`, `soul`, `pdflscape`, KOMA-Script page styles, font setup commands, `\ghostprompt`, `\maketitle`, `\tableofcontents`, `\printbibliography`, etc.
-2. **make4ht** compiles the LaTeX document with `dvilualatex`, producing HTML with footnotes. TikZ and PGF diagrams are rendered to SVG via `dvisvgm`.
-3. **Citation resolution** (`resolve-citations.py`) parses `.bib` files and replaces raw citation keys in footnotes with formatted author/title/year text.
-4. **DOM filter** (or Python fallback) restructures tex4ht's footnote HTML into the format Pandoc expects.
-5. **Pandoc** with a Lua filter converts the HTML footnote structure into real `pandoc.Note` AST elements, producing proper Word footnotes in the docx output. Generated images (SVGs from TikZ, etc.) are embedded into the docx via `--extract-media`.
+1. **Preprocessing** (`preprocess-tex.py`) strips packages and commands that cause `dvilualatex` to hang or are irrelevant for HTML output (`fontspec`, `unicode-math`, `luatexja-fontspec`, `soul`, `pdflscape`, KOMA-Script page styles, font setup commands, etc.). It also injects patches after `\begin{document}` to fix the tex4ht + biblatex-oscola stack overflow and restore per-chapter citation reset (see Technical Notes).
+2. **make4ht** compiles the document with `dvilualatex` in 4 passes (`htlatex → biber → htlatex → htlatex`), producing HTML with fully resolved OSCOLA citations and footnotes. TikZ/PGF diagrams are rendered to SVG via `dvisvgm`.
+3. **DOM filter** restructures tex4ht's per-chapter footnote HTML into a single globally-numbered Pandoc-compatible structure.
+4. **Pandoc** with a Lua filter converts the HTML footnote structure into real `pandoc.Note` AST elements, producing proper Word footnotes in the docx output. Generated images (SVGs from TikZ, etc.) are embedded via `--extract-media`.
+5. **Footnote numbering fix** (`fix-footnote-numbering.py`) detects book classes and post-processes the docx to insert section breaks at each chapter and restart footnote numbering per section, so that Word's footnote numbers match the "(n X)" back-references in the citation text.
 
 ## Validation
 
@@ -87,6 +87,7 @@ Then open it in Word, modify the styles (Normal, Heading 1, Footnote Text, etc.)
 | `domfilters/make4ht-footnotes.lua` | Footnote restructuring (primary) |
 | `fix-footnotes.py` | Footnote restructuring (fallback) |
 | `pandoc-footnotes.lua` | Pandoc AST filter for footnotes |
+| `fix-footnote-numbering.py` | Post-processes docx to restart footnotes per chapter |
 | `validate.py` | Pipeline validation |
 | `reference.docx` | Bundled style template for docx output |
 
@@ -108,12 +109,21 @@ biblatex-oscola (via `verbose-inote.cbx`) uses `\label{cbx@N}` inside `footcite:
 
 The preprocessor fixes this by injecting code after `\begin{document}` that replaces these macros with the originals tex4ht saved as `\:label` (`\csname :label\endcsname` with `\catcode\`\:=11`) and `\o:ref`. This means "(n X)" back-references won't be hyperlinked in HTML, but they resolve correctly via the standard `.aux` mechanism.
 
+### Per-chapter citation reset (`citereset=chapter`)
+
+biblatex's `citereset=chapter` option hooks into KOMA-Script's `\AddtoDoHook{heading/begingroup/chapter}` mechanism to call `\citereset` at each chapter. tex4ht redefines the KOMA heading machinery, breaking this hook — so citations seen in earlier chapters are never reset, and subsequent chapters incorrectly use the short "(n X)" form instead of the full citation on first appearance.
+
+The preprocessor fixes this by patching `\chapter` after `\begin{document}` to call `\citereset` directly before the original command.
+
+### Per-chapter footnote numbering in book classes
+
+For book/scrbook/report document classes, the pipeline post-processes the docx to insert continuous section breaks before each chapter heading and sets `<w:numRestart w:val="eachSect"/>` in every section and in `word/settings.xml`. This makes Word restart footnote numbering at each chapter, matching the "(n X)" back-reference numbers in the citation text.
+
 ## Known limitations
 
 - **fontspec / luaotfload**: These packages cause infinite loops in DVI mode. They are automatically stripped by the preprocessor and blocked by tex4ht hooks.
 - **CJK text**: `luatexja-fontspec` is stripped. CJK characters will appear in the output if the system has appropriate fonts, but without specific font selection.
 - **`\sout` / `\ul` (soul package)**: Replaced with passthrough stubs since `soul` is stripped.
-- **Per-chapter footnote numbering**: tex4ht resets footnote numbers per chapter in book classes. The DOM filter renumbers them globally for the docx output.
 
 ## License
 

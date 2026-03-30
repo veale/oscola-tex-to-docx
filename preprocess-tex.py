@@ -237,6 +237,12 @@ footcite_fix = r"""
         {}}}
 \fi
 \catcode`\:=12
+% Fix citereset=chapter: KOMA's \AddtoDoHook{heading/begingroup/chapter}
+% doesn't fire under tex4ht. Patch \chapter to call \citereset directly.
+\ifdefined\chapter
+  \let\cbx@origchapter\chapter
+  \renewcommand{\chapter}{\citereset\cbx@origchapter}
+\fi
 \makeatother
 """
 
@@ -244,7 +250,13 @@ footcite_fix = r"""
 text = text.replace(r'\begin{document}',
                     stubs + r'\begin{document}' + footcite_fix)
 
-# ── 12. Clean up multiple blank lines ─────────────────────────────────
+# ── 12. Force \citereset at each \chapter ─────────────────────────────
+# biblatex's citereset=chapter hooks into KOMA's \AddtoDoHook which
+# tex4ht breaks by redefining the heading machinery. Patch \chapter
+# to call \citereset so each chapter gets fresh full citations.
+# This is injected after \begin{document} alongside the footcite fix.
+
+# ── 13. Clean up multiple blank lines ─────────────────────────────────
 text = re.sub(r'\n{3,}', '\n\n', text)
 
 open(path, 'w', encoding='utf-8').write(text)

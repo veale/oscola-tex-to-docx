@@ -223,6 +223,14 @@ if ! pandoc "${PANDOC_ARGS[@]}" 2>&1; then
     exit 1
 fi
 
+# --- Fix footnote numbering (restart per chapter for book classes) ---
+RESTART_FLAG=""
+if grep -qE '\\documentclass(\[.*\])?\{(scr)?book\}|\\documentclass(\[.*\])?\{(scr)?reprt\}' "$INPUT_BASE.tex" 2>/dev/null; then
+    RESTART_FLAG="--restart-footnotes"
+    echo "Book class detected — restarting footnote numbering per chapter..."
+fi
+python3 "$SCRIPT_DIR/fix-footnote-numbering.py" $RESTART_FLAG "$OUTPUT" 2>&1 || echo "Warning: footnote numbering fix failed, continuing"
+
 # --- Keep HTML if requested ---
 if [[ "$KEEP_HTML" == true ]]; then
     OUTPUT_DIR="$(dirname "$OUTPUT")"
