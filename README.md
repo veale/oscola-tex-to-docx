@@ -2,7 +2,7 @@
 
 Convert LaTeX documents using `biblatex-oscola` (the OSCOLA legal citation style) to `.docx` files with correct Word footnotes.
 
-This tool exists because biblatex-oscola's citation formatting — ibid tracking, "(n X)" back-references, case/legislation formatting, conditional short titles — is too complex for any external converter to replicate. Instead, we let TeX do the formatting via `make4ht`, capture the HTML output with fully resolved citations, then convert to docx via Pandoc.
+This tool exists because biblatex-oscola's citation formatting — ibid tracking (at least for editions below the 5th), "(n X)" back-references, case/legislation formatting, conditional short titles — is too complex for any external converter to replicate. Instead, we let TeX do the formatting via `make4ht`, capture the HTML output with fully resolved citations, then convert to docx via Pandoc.
 
 ## Prerequisites
 
